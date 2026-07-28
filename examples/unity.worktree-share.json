@@ -1,0 +1,52 @@
+{
+  "$doc": "Unity 프로젝트용 안전 설정 예시(README '격리 vs 공유' 의 패턴 B). 규칙: 읽기전용 서드파티/캐시만 junction 으로 공유하고, 내가 리소스·프리팹·플러그인·패키지를 추가/편집하는 폴더는 격리(실제 파일)로 남긴다. '<unity-dir>' 를 실제 Unity 폴더명(Client, unity, src …)으로 바꾸세요. 실제 파일은 표준 JSON 이라 주석은 '_comment' 키로만.",
+
+  "$격리로_남기는_폴더": {
+    "_이유": "여기에 PNG/prefab/DLL 등을 새로 추가·편집하므로 junction 하면 main 으로 새어나가 격리가 깨진다. 아래는 shares 에 '넣지 않음'으로써 자동으로 실제 파일(=git 격리)로 유지된다.",
+    "폴더들": [
+      "<unity-dir>/Assets/Scripts", "<unity-dir>/Assets/Editor",
+      "<unity-dir>/Assets/Prefabs", "<unity-dir>/Assets/Resources",
+      "<unity-dir>/Assets/Images", "<unity-dir>/Assets/VFX",
+      "<unity-dir>/Assets/StreamingAssets", "<unity-dir>/Assets/Plugins"
+    ]
+  },
+
+  "$note_Packages": "Packages(UPM manifest)는 일부러 shares 에 넣지 않았다. junction 하면 manifest 가 main 에 기록되어 전 워크트리가 같은 패키지셋을 강제 공유하게 된다. 워크트리별로 다른 패키지를 추가하려면 격리(기본)로 두는 게 맞다. 팀 전체가 항상 동일 패키지셋이고 안 바뀐다면 { path:'<unity-dir>/Packages', mode:'link', optional:true } 를 shares 에 추가해도 된다.",
+
+  "$note_ProjectSettings": "ProjectSettings 도 넣지 않았다. 패키지/플러그인 추가 시 scripting define, preset 등이 바뀔 수 있어 워크트리별 격리가 안전하다. 공유가 확실히 필요할 때만 shares 에 link 로 추가.",
+
+  "shares": [
+    {
+      "_comment": "Library 공유 = 에디터 즉시 진입의 핵심. 무거운 캐시(ShaderCache/PackageCache/Bee/Burst…)는 junction 공유, 배타 Lock DB와 워크트리별 산출물은 copy 로 독립. PackageManager 를 copy 에 넣어 UPM 해석 상태도 워크트리별 독립화(다운로드 캐시 PackageCache 는 계속 공유).",
+      "path": "<unity-dir>/Library",
+      "mode": "cache",
+      "copy": [
+        "ArtifactDB", "ArtifactDB-lock",
+        "SourceAssetDB", "SourceAssetDB-lock",
+        "Artifacts", "TempArtifacts",
+        "ScriptAssemblies",
+        "StateCache",
+        "ShaderCache.db",
+        "BuildPlayer.prefs",
+        "ilpp.pid",
+        "PackageManager"
+      ]
+    },
+    {
+      "_comment": "무거운 '읽기전용 서드파티 SDK/툴' 만 junction 으로 공유(디스크 절약). optional 이라 -IncludeOptional 일 때만 적용. ★ 여기에는 개발 중 파일을 추가하는 폴더(Prefabs/Resources/Images/VFX/Plugins 등)를 넣지 말 것. 아래는 예시 목록이니 프로젝트에 맞게 교체.",
+      "path": "<unity-dir>/Assets",
+      "mode": "link-children",
+      "optional": true,
+      "children": [
+        "TextMesh Pro",
+        "AmplifyShaderEditor",
+        "Best HTTP",
+        "Firebase",
+        "GoogleMobileAds",
+        "FacebookSDK",
+        "Standard Assets",
+        "Unity Technologies"
+      ]
+    }
+  ]
+}
