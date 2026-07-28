@@ -1,0 +1,20 @@
+{
+  "$doc": "이 파일을 리포 루트에 .worktree-share.json 으로 복사해서 리포에 맞게 수정하세요.",
+  "shares": [
+    {
+      "path": "<unity-dir>/Library",
+      "mode": "cache",
+      "_comment": "Unity 캐시 공유. 자식 dir는 junction, 파일/lock DB는 복사. copy 생략 시 Unity 기본 lock 목록 사용.",
+      "copy": ["ArtifactDB", "SourceAssetDB", "Artifacts", "ScriptAssemblies"]
+    },
+    {
+      "path": "<some-base>",
+      "mode": "link-children",
+      "optional": true,
+      "_comment": "base 아래 지정한 하위 폴더 각각을 junction. 무거운 서드파티/아트/캐시 등.",
+      "children": ["FolderA", "FolderB"]
+    },
+    { "path": "<whole-dir-to-junction>", "mode": "link", "optional": true, "_comment": "폴더 통째로 junction (예: Packages)" },
+    { "path": "<dir-to-copy>", "mode": "copy", "optional": true, "_comment": "폴더 통째로 독립 복사 (예: 빌드 산출물 캐시)" }
+  ]
+}
