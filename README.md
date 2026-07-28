@@ -22,11 +22,15 @@ worktree-share/                 (이 레포 = 엔진, 한 벌만 유지)
 
 ## 설치 (한 번)
 
-이 레포를 고정 경로에 한 번만 클론한다. 예:
+이 레포를 **고정 경로**에 한 번만 클론한다. 그 경로를 이 문서에서 `<engine-dir>` 로 표기한다
+(팀/PC마다 자유, 예: `~/tools/worktree-share` 또는 원하는 위치).
 ```
-git clone <worktree-share-url> E:\Projects\worktree-share
+git clone <this-repo-url> <engine-dir>
 ```
-이후 업데이트는 `git -C E:\Projects\worktree-share pull` 한 번. 모든 리포가 같은 엔진을 쓴다.
+이후 업데이트는 `git -C <engine-dir> pull` 한 번. 모든 리포가 같은 엔진을 쓴다.
+
+> 아래 예시의 `<engine-dir>` 는 클론한 실제 경로로 바꿔서 쓴다. Orca 훅 등에 넣을 땐
+> 그 경로가 안 바뀌도록 안정적인 위치를 고르는 게 좋다.
 
 ## 리포에 적용
 
@@ -36,8 +40,8 @@ git clone <worktree-share-url> E:\Projects\worktree-share
 ### A) Orca 훅 (자동)
 
 Orca → Settings → Repository hooks 에 (모든 리포 동일 명령):
-- **Setup**  : `E:\Projects\worktree-share\orca-setup.cmd`
-- **Archive**: `E:\Projects\worktree-share\orca-archive.cmd`
+- **Setup**  : `<engine-dir>\orca-setup.cmd`
+- **Archive**: `<engine-dir>\orca-archive.cmd`
 
 엔진이 `ORCA_WORKTREE_PATH` 로 대상 워크트리를, `git worktree list` 로 원본 리포를,
 `<repo>/.worktree-share.json` 으로 규칙을 자동 인식한다. **리포마다 설정 바꿀 필요 없음.**
@@ -50,13 +54,13 @@ Orca → Settings → Repository hooks 에 (모든 리포 동일 명령):
 
 ```powershell
 # 워크트리 하나에 공유 적용 (원본/설정 자동 감지)
-powershell -File E:\Projects\worktree-share\share-worktree.ps1 -Worktree <워크트리경로>
+powershell -File <engine-dir>\share-worktree.ps1 -Worktree <워크트리경로>
 
 # optional 항목(무거운 자산 등)까지
 ... share-worktree.ps1 -Worktree <경로> -IncludeOptional
 
 # 제거 (junction 안전 해제 후)
-powershell -File E:\Projects\worktree-share\remove-worktree.ps1 -Worktree <경로> -DeleteBranch
+powershell -File <engine-dir>\remove-worktree.ps1 -Worktree <경로> -DeleteBranch
 ```
 
 ## `.worktree-share.json` 스키마
@@ -94,7 +98,12 @@ junction 이 걸린 워크트리를 `git worktree remove` / `rm -rf` / `git clea
 링크를 따라가 **원본까지 삭제**될 수 있다. 반드시 `remove-worktree.ps1`(또는 archive 훅 =
 `-Detach`)로 링크를 먼저 끊고 제거할 것.
 
-## 리포별 예시
+## 예시 설정
 
-- `E:/Projects/growdaemon/.worktree-share.json` — Unity 폴더 `Client/`, 서드파티 에셋 다수(optional)
-- `E:/Projects/bun3-kit/.worktree-share.json` — Unity 폴더 `unity/`, Library 위주
+`examples/` 의 템플릿을 참고해 각 리포 루트에 `.worktree-share.json` 을 둔다. 리포마다
+Unity 폴더명(`Client/`, `unity/`, `src/` …)이나 공유할 폴더가 달라도, 그 차이는 전부 이
+설정 파일이 흡수하므로 **엔진은 손대지 않는다**.
+
+- **Unity 프로젝트**: `<unity-dir>/Library` 를 `cache` 모드로 (Library 캐시 공유가 핵심).
+  무거운 서드파티 에셋 폴더는 `link-children` + `optional:true` 로.
+- **일반 프로젝트**: `node_modules`, `.venv`, 빌드 산출물 캐시 등을 `link`/`copy` 로.
