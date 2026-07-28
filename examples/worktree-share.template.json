@@ -1,5 +1,5 @@
 {
-  "$doc": "이 파일을 리포 루트에 .worktree-share.json 으로 복사해서 리포에 맞게 수정하세요.",
+  "$doc": "이 파일을 레포 루트에 .worktree-share.json 으로 복사해서 레포에 맞게 수정하세요.",
   "shares": [
     {
       "path": "<unity-dir>/Library",

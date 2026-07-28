@@ -3,7 +3,7 @@
     설정(.worktree-share.json) 기반으로 워크트리에 경로를 공유(junction)/복사한다. (범용, 프레임워크 무관)
 
 .DESCRIPTION
-    엔진은 어떤 리포에도 종속되지 않는다. 각 리포 루트의 .worktree-share.json 이
+    엔진은 어떤 레포에도 종속되지 않는다. 각 레포 루트의 .worktree-share.json 이
     "무엇을 어떻게 공유할지"를 선언하고, 엔진은 그 경로만 참조해 적용한다.
 
     소스(main)는 대상 워크트리에서 `git worktree list` 첫 항목(메인 작업트리)으로 자동 감지한다.
