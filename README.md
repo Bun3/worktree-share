@@ -15,6 +15,7 @@ worktree-share/                 (이 레포 = 엔진, 한 벌만 유지)
   orca-setup.cmd                Orca "setup" 훅 래퍼 (ORCA_WORKTREE_PATH 사용)
   orca-archive.cmd              Orca "archive" 훅 래퍼 (-Detach)
   remove-worktree.ps1           junction 안전 해제 후 워크트리 제거
+  install-repo.ps1              레포에 orca.yaml(훅) 설치 — 템플릿을 엔진이 소유
   examples/worktree-share.template.json
   examples/unity.worktree-share.json
 각 레포:
@@ -36,25 +37,83 @@ git clone <this-repo-url> <engine-dir>
 ## 레포에 적용
 
 1. `examples/` 의 예시를 레포 루트에 `.worktree-share.json` 으로 복사해 수정하고 커밋.
-2. 워크트리 만들 때 엔진을 호출 (아래 셋 중 하나).
+2. 워크트리 만들 때 엔진을 호출 (아래 A~C 중 하나. **A 권장**).
 
-### A) Orca 훅 (자동)
+### A) `orca.yaml` — 엔진이 설치해 주고, 레포에 커밋 (권장)
 
-Orca → Settings → Repository hooks 에 (모든 레포 동일 명령):
-- **Setup**  : `<engine-dir>\orca-setup.cmd`
-- **Archive**: `<engine-dir>\orca-archive.cmd`
+훅 파일을 손으로 복사하지 않는다. **엔진의 설치 스크립트가 레포에 넣어 준다.**
+
+```powershell
+# 레포 하나 (여러 개 나열 가능)
+powershell -File <engine-dir>\install-repo.ps1 -Repo <레포경로> [, <레포경로2> ...]
+
+# 기존 orca.yaml 을 새 템플릿으로 갱신
+powershell -File <engine-dir>\install-repo.ps1 -Repo <레포경로> -Force
+```
+
+- `<repo>/orca.yaml` 생성 — 훅 내용은 엔진이 소유하므로 템플릿이 바뀌면 다시 실행만 하면 된다.
+- `<repo>/.worktree-share.json` 이 없으면 예시를 복사해 둔다(`-Example unity|template`). **내용은 레포에 맞게 수정할 것.**
+- 이미 있는 다른 용도의 `orca.yaml` 은 건드리지 않고 건너뛴다(`-Force` 로만 덮어씀).
+- 둘 다 **커밋 대상**이다. 커밋하면 클론한 사람 모두가 자동으로 훅을 갖고, **PC마다 UI를 만질 필요가 없다.**
+  Orca 는 파일 저장 즉시 인식한다(재시작 불필요).
+
+생성되는 내용:
+
+```yaml
+# Orca 워크트리 훅 — worktree-share 엔진으로 무거운 캐시를 junction 공유한다.
+# 이 파일은 <engine>/install-repo.ps1 이 생성했다. 엔진을 갱신했으면 다시 실행하면 된다.
+# - 공유 규칙: 레포 루트의 .worktree-share.json (엔진이 자동으로 읽음)
+# - 엔진 경로가 다른 PC는 환경변수 WORKTREE_SHARE_HOME 만 설정하면 된다(이 파일 수정 불필요).
+# - 엔진이 아예 없는 PC에서는 조용히 건너뛴다(워크트리는 정상 생성, 캐시만 새로 만들어짐).
+# - archive 훅은 junction 을 먼저 끊어 원본 삭제 사고를 막는다.
+scripts:
+  setup: |
+    if defined WORKTREE_SHARE_HOME (set "WS=%WORKTREE_SHARE_HOME%") else (set "WS=<설치한 PC의 engine-dir>")
+    if exist "%WS%\orca-setup.cmd" (call "%WS%\orca-setup.cmd") else (echo [worktree-share] engine not found - skipped)
+  archive: |
+    if defined WORKTREE_SHARE_HOME (set "WS=%WORKTREE_SHARE_HOME%") else (set "WS=<설치한 PC의 engine-dir>")
+    if exist "%WS%\orca-archive.cmd" (call "%WS%\orca-archive.cmd") else (echo [worktree-share] engine not found - skipped)
+```
+
+**PC마다 엔진 경로가 달라도 이 파일을 고치지 않는다.** 두 단계로 흡수한다:
+
+| 상황 | 결과 |
+|---|---|
+| 엔진 경로가 파일에 적힌 것과 같음 | 그대로 공유 적용 |
+| 경로가 다름 | 그 PC에서 환경변수 **`WORKTREE_SHARE_HOME`** 만 자기 경로로 설정 (`setx WORKTREE_SHARE_HOME "D:\tools\worktree-share"` 후 Orca 재시작) |
+| 엔진을 아예 안 씀 | `engine not found - skipped` 출력하고 **워크트리는 정상 생성** (캐시만 새로 만들어질 뿐) |
 
 엔진이 `ORCA_WORKTREE_PATH` 로 대상 워크트리를, `git worktree list` 로 원본 레포를,
-`<repo>/.worktree-share.json` 으로 규칙을 자동 인식한다. **레포마다 설정 바꿀 필요 없음.**
+`<repo>/.worktree-share.json` 으로 규칙을 자동 인식한다. **레포마다 명령을 바꿀 필요 없음.**
 
-> ⚠ Orca 의 **"Wait for setup to complete before starting agent" 는 끄세요.** 켜면 Orca 가
-> cmd 전용 시퀀싱 래퍼를 만드는데 셸이 cmd 가 아니면 깨진다. 끄면 setup(공유)은 그대로 돌고
-> 에이전트는 정상 실행된다.
->
-> 무거운 자산까지 공유(optional 항목)하려면 Setup 명령 끝에 `-IncludeOptional` 을 붙인다.
+### B) Orca UI 로컬 스크립트 (이 PC에서만)
+
+`orca.yaml` 을 못 쓰거나(레포에 커밋 불가) 엔진 경로가 자기만 다를 때.
+
+1. Orca 좌하단 **톱니(설정)** 클릭
+2. 좌측 상단 **설정 검색**에 `hook` 입력 → 결과의 **프로젝트** 목록에서 레포 클릭
+3. 아래로 스크롤해 **작업트리 훅** 섹션:
+   - **설정 스크립트 → 로컬** 칸: `<engine-dir>\orca-setup.cmd`
+   - **아카이브 스크립트 → 로컬** 칸: `<engine-dir>\orca-archive.cmd`
+   - **실행 시기**: `기본적으로 실행`
+   - **agent를 시작하기 전에 설정이 완료될 때까지 기다리세요**: **끔**
+     (켜면 Orca 가 cmd 전용 시퀀싱 래퍼를 만드는데 셸이 cmd 가 아니면 깨진다.
+     끄면 setup(공유)은 그대로 돌고 에이전트는 정상 실행된다.)
+
+칸을 벗어나면(다른 곳 클릭) 즉시 저장된다. 확인은 `orca repo list --json`.
+
+> **우선순위**: 로컬 스크립트가 있으면 `orca.yaml` 대신 **로컬만** 실행된다
+> (Orca 내부 규칙: 로컬 있음 → `local-only`, 없음 → `shared-only`).
+> 그래서 A)를 쓰기로 했으면 로컬 칸은 **비워 둬야** orca.yaml 이 동작한다.
+
+> ⚠ **`orca-data.json` 을 직접 편집하지 말 것.** Orca 는 실행 중 상태를 메모리에 들고 있다가
+> 종료할 때 파일 전체를 다시 쓴다. 실행 중 편집한 내용은 종료 시 통째로 덮어써져 사라진다.
+> `orca` CLI 에도 훅을 설정하는 명령은 없다(`repo list/show/add/set-base-ref/search-refs` 뿐).
+
+> 무거운 자산까지 공유(optional 항목)하려면 setup 명령 끝에 `-IncludeOptional` 을 붙인다.
 > (단, 아래 "격리 vs 공유" 를 반드시 읽고 결정할 것.)
 
-### B) 수동 (CLI)
+### C) 수동 (CLI)
 
 ```powershell
 # 워크트리 하나에 공유 적용 (원본/설정 자동 감지)
