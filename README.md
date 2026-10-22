@@ -63,25 +63,36 @@ powershell -File <engine-dir>\install-repo.ps1 -Repo <레포경로> -Force
 # Orca 워크트리 훅 — worktree-share 엔진으로 무거운 캐시를 junction 공유한다.
 # 이 파일은 <engine>/install-repo.ps1 이 생성했다. 엔진을 갱신했으면 다시 실행하면 된다.
 # - 공유 규칙: 레포 루트의 .worktree-share.json (엔진이 자동으로 읽음)
-# - 엔진 경로가 다른 PC는 환경변수 WORKTREE_SHARE_HOME 만 설정하면 된다(이 파일 수정 불필요).
-# - 엔진이 아예 없는 PC에서는 조용히 건너뛴다(워크트리는 정상 생성, 캐시만 새로 만들어짐).
+# - 엔진 위치는 PC마다 환경변수 WORKTREE_SHARE_HOME 으로 지정한다(이 파일에 개인 경로를 남기지 않는다).
+#   예: setx WORKTREE_SHARE_HOME "E:\Projects\worktree-share" 후 Orca 재시작
+# - 변수가 없는 PC에서는 조용히 건너뛴다(워크트리는 정상 생성, 캐시만 새로 만들어짐).
 # - archive 훅은 junction 을 먼저 끊어 원본 삭제 사고를 막는다.
+# - Orca 는 각 줄을 "call <줄>" 로 감싼 runner 로 실행하는데 "call if ..." 는 실패한다.
+#   그래서 줄마다 cmd /d /c 로 감싸고, 줄 사이에 변수를 넘기지 않도록 한 줄로 쓴다.
 scripts:
   setup: |
-    if defined WORKTREE_SHARE_HOME (set "WS=%WORKTREE_SHARE_HOME%") else (set "WS=<설치한 PC의 engine-dir>")
-    if exist "%WS%\orca-setup.cmd" (call "%WS%\orca-setup.cmd") else (echo [worktree-share] engine not found - skipped)
+    cmd /d /c if defined WORKTREE_SHARE_HOME (call "%WORKTREE_SHARE_HOME%\orca-setup.cmd") else (echo [worktree-share] WORKTREE_SHARE_HOME not set - skipped)
   archive: |
-    if defined WORKTREE_SHARE_HOME (set "WS=%WORKTREE_SHARE_HOME%") else (set "WS=<설치한 PC의 engine-dir>")
-    if exist "%WS%\orca-archive.cmd" (call "%WS%\orca-archive.cmd") else (echo [worktree-share] engine not found - skipped)
+    cmd /d /c if defined WORKTREE_SHARE_HOME (call "%WORKTREE_SHARE_HOME%\orca-archive.cmd") else (echo [worktree-share] WORKTREE_SHARE_HOME not set - skipped)
 ```
 
-**PC마다 엔진 경로가 달라도 이 파일을 고치지 않는다.** 두 단계로 흡수한다:
+**커밋되는 파일에는 경로가 없다.** 엔진을 쓰는 PC마다 환경변수만 한 번 설정한다:
 
 | 상황 | 결과 |
 |---|---|
-| 엔진 경로가 파일에 적힌 것과 같음 | 그대로 공유 적용 |
-| 경로가 다름 | 그 PC에서 환경변수 **`WORKTREE_SHARE_HOME`** 만 자기 경로로 설정 (`setx WORKTREE_SHARE_HOME "D:\tools\worktree-share"` 후 Orca 재시작) |
-| 엔진을 아예 안 씀 | `engine not found - skipped` 출력하고 **워크트리는 정상 생성** (캐시만 새로 만들어질 뿐) |
+| `WORKTREE_SHARE_HOME` 설정됨 | 그 경로의 엔진으로 공유 적용 |
+| 설정 안 됨 (엔진을 안 쓰는 PC) | `WORKTREE_SHARE_HOME not set - skipped` 출력하고 **워크트리는 정상 생성** (캐시만 새로 만들어질 뿐) |
+
+```powershell
+setx WORKTREE_SHARE_HOME "E:\Projects\worktree-share"   # 엔진을 클론한 경로
+```
+
+설정 후 Orca 를 재시작해야 훅 터미널이 새 변수를 받는다. 변수를 지울 때는 그 전에 만든
+워크트리를 먼저 정리할 것 — 변수가 없으면 archive 훅도 건너뛰어 junction 을 끊지 못한다.
+
+> Orca 는 훅 스크립트의 각 줄을 `call <줄>` 로 감싼 runner(`.git/worktrees/<id>/orca/setup-runner.cmd`)로 실행한다.
+> `if`·`set` 같은 cmd 내장 명령으로 시작하는 줄은 `call` 할 수 없어 `'if' is not recognized` 로 실패하므로,
+> 훅을 직접 고칠 때도 `cmd /d /c ...` 처럼 실행 파일로 시작하는 한 줄을 유지할 것.
 
 엔진이 `ORCA_WORKTREE_PATH` 로 대상 워크트리를, `git worktree list` 로 원본 레포를,
 `<repo>/.worktree-share.json` 으로 규칙을 자동 인식한다. **레포마다 명령을 바꿀 필요 없음.**
