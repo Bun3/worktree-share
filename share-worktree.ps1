@@ -15,7 +15,7 @@
         { "path": "unity/Library", "mode": "cache" },              // 캐시: 자식 dir는 junction, 파일+lock은 복사
         { "path": "unity/Library", "mode": "cache",
           "copy": ["ArtifactDB","SourceAssetDB", ...],              // copy 생략 시 Unity 기본 lock 목록 사용
-          "exclude": ["Bee"] },                                      // 공유하지 않음(절대경로를 박는 캐시 등)
+          "exclude": ["Bee"] },                                      // 공유하지 않음. 생략 시 ["Bee"], [] 면 제외 없음
         { "path": "unity/Packages", "mode": "link" },              // 통째로 junction
         { "path": "server/artifacts", "mode": "copy" },            // 통째로 복사(독립)
         { "path": "unity/Assets", "mode": "link-children",         // base 아래 children 각각 junction
@@ -48,6 +48,8 @@ $DefaultCacheCopy = @(
     'Artifacts', 'TempArtifacts', 'ScriptAssemblies', 'StateCache',
     'ShaderCache.db', 'BuildPlayer.prefs', 'ilpp.pid'
 )
+# cache 모드에서 exclude 미지정 시 공유하지 않는 목록 (Bee dag 는 프로젝트 절대경로를 기록 → junction 하면 워크트리 삭제 후 main 컴파일 실패)
+$DefaultCacheExclude = @('Bee')
 $DefaultConfigName = '.worktree-share.json'
 
 # ─── 헬퍼 ────────────────────────────────────────────────────
@@ -143,7 +145,8 @@ foreach ($s in $cfg.shares) {
             $copyNames = if ($s.copy) { @($s.copy) } else { $DefaultCacheCopy }
             New-Item -ItemType Directory -Force -Path $dst | Out-Null
             $l = 0; $c = 0
-            Get-ChildItem -LiteralPath $src -Force | Where-Object { @($s.exclude) -notcontains $_.Name } | ForEach-Object {
+            $excludeNames = if ($null -ne $s.exclude) { @($s.exclude) } else { $DefaultCacheExclude }
+            Get-ChildItem -LiteralPath $src -Force | Where-Object { $excludeNames -notcontains $_.Name } | ForEach-Object {
                 $childDst = Join-Path $dst $_.Name
                 if (($copyNames -contains $_.Name) -or (-not $_.PSIsContainer)) {
                     Copy-Item -LiteralPath $_.FullName -Destination $childDst -Recurse -Force; $c++

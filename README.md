@@ -160,7 +160,7 @@ powershell -File <engine-dir>\remove-worktree.ps1 -Worktree <경로> -DeleteBran
 | `path` | 레포 루트 기준 상대경로. 원본이 없으면 조용히 건너뜀. |
 | `mode` | `link` / `copy` / `cache` / `link-children` (아래) |
 | `copy` | (cache 전용) 공유하지 않고 복사할 자식 이름 목록. 생략 시 Unity 기본 lock 목록. |
-| `exclude` | (cache 전용) junction도 복사도 하지 않을 자식 이름 목록. 워크트리가 처음부터 새로 만든다. |
+| `exclude` | (cache 전용) junction도 복사도 하지 않을 자식 이름 목록. 워크트리가 처음부터 새로 만든다. 생략 시 `["Bee"]`, `[]` 면 제외 없음. |
 | `children` | (link-children 전용) base 아래 junction 할 하위 폴더 이름들. |
 | `optional` | `true` 면 `-IncludeOptional` 일 때만 적용. |
 
@@ -215,7 +215,7 @@ junction(공유) 폴더에 **새 파일을 추가하거나 수정하면, 그 변
 | 편집·추가 대상(내 콘텐츠) | `Assets/Scripts`, `Assets/Prefabs`, `Assets/Resources`, `Assets/Images`, `Assets/VFX` | **격리** (공유하지 말 것) |
 | 읽기전용 서드파티 SDK/툴 | `TextMesh Pro`, `Firebase`, `Best HTTP`, `AmplifyShaderEditor` | `link`/`link-children` 공유 OK |
 | 재생성되는 무거운 캐시 | `Library/ShaderCache`, `Library/PackageCache` | `cache` 로 junction 공유 OK |
-| 절대경로를 기록하는 빌드 캐시 | `Library/Bee` | `cache` 의 `exclude` 로 공유 안 함 (아래) |
+| 절대경로를 기록하는 빌드 캐시 | `Library/Bee` | `cache` 의 `exclude`(기본값)로 공유 안 함 (아래) |
 | 배타 잠금/워크트리별 산출물 | `Library/ArtifactDB`, `Library/ScriptAssemblies`, `Library/Artifacts` | `cache` 의 `copy` 로 독립 |
 
 ### 액션별 결과 (Unity 기준)
@@ -278,8 +278,8 @@ Bee(스크립트 컴파일 빌드 시스템)는 dag 파일에 프로젝트 **절
   지운 뒤 main 에서 컴파일하면 `Internal build system error … Could not find a part of the path
   "<워크트리>\…\Library\Bee\…"` 로 실패한다. 복구는 에디터를 닫고 main `Library/Bee` 내용을 지우면 된다
   (재생성됨).
-- 복사해도 사본의 dag 가 main 경로를 가리켜 위험하다. 그래서 `exclude` 로 빼고 워크트리마다 새로 만든다
-  (첫 스크립트 컴파일만 처음부터 빌드).
+- 복사해도 사본의 dag 가 main 경로를 가리켜 위험하다. 그래서 `exclude` 기본값이 `["Bee"]` 이고, 워크트리마다
+  새로 만든다(첫 스크립트 컴파일만 처음부터 빌드). `exclude` 를 직접 지정하면 기본값을 대체하므로 Bee 도 넣는다.
 
 ### 안전 체크리스트
 
