@@ -17,7 +17,7 @@
 
   "shares": [
     {
-      "_comment": "Library 공유 = 에디터 즉시 진입의 핵심. 무거운 캐시(ShaderCache/PackageCache/Bee/Burst…)는 junction 공유, 배타 Lock DB와 워크트리별 산출물은 copy 로 독립. PackageManager 를 copy 에 넣어 UPM 해석 상태도 워크트리별 독립화(다운로드 캐시 PackageCache 는 계속 공유).",
+      "_comment": "Library 공유 = 에디터 즉시 진입의 핵심. 무거운 캐시(ShaderCache/PackageCache/Burst…)는 junction 공유, 배타 Lock DB와 워크트리별 산출물은 copy 로 독립. PackageManager 를 copy 에 넣어 UPM 해석 상태도 워크트리별 독립화(다운로드 캐시 PackageCache 는 계속 공유). Bee 는 dag 에 워크트리 절대경로를 기록하므로 exclude(복사해도 main 경로를 가리켜 위험).",
       "path": "<unity-dir>/Library",
       "mode": "cache",
       "copy": [
@@ -30,7 +30,8 @@
         "BuildPlayer.prefs",
         "ilpp.pid",
         "PackageManager"
-      ]
+      ],
+      "exclude": ["Bee"]
     },
     {
       "_comment": "무거운 '읽기전용 서드파티 SDK/툴' 만 junction 으로 공유(디스크 절약). optional 이라 -IncludeOptional 일 때만 적용. ★ 여기에는 개발 중 파일을 추가하는 폴더(Prefabs/Resources/Images/VFX/Plugins 등)를 넣지 말 것. 아래는 예시 목록이니 프로젝트에 맞게 교체.",

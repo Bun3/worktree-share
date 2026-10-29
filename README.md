@@ -160,6 +160,7 @@ powershell -File <engine-dir>\remove-worktree.ps1 -Worktree <경로> -DeleteBran
 | `path` | 레포 루트 기준 상대경로. 원본이 없으면 조용히 건너뜀. |
 | `mode` | `link` / `copy` / `cache` / `link-children` (아래) |
 | `copy` | (cache 전용) 공유하지 않고 복사할 자식 이름 목록. 생략 시 Unity 기본 lock 목록. |
+| `exclude` | (cache 전용) junction도 복사도 하지 않을 자식 이름 목록. 워크트리가 처음부터 새로 만든다. |
 | `children` | (link-children 전용) base 아래 junction 할 하위 폴더 이름들. |
 | `optional` | `true` 면 `-IncludeOptional` 일 때만 적용. |
 
@@ -184,6 +185,7 @@ powershell -File <engine-dir>\remove-worktree.ps1 -Worktree <경로> -DeleteBran
 
 **`cache` 판정 규칙** — `path` 하위 각 항목에 대해:
 ```
+- 이름이 exclude 목록에 → 건너뜀 (워크트리가 새로 생성)
 - 파일이면            → copy    (junction 은 폴더 전용; 파일은 작으니 복사)
 - 이름이 copy 목록에  → copy    (독립 필요: DB / lock / 워크트리별 산출물)
 - 그 외 디렉터리      → junction (공유: 무거운 안정 캐시)
@@ -212,7 +214,8 @@ junction(공유) 폴더에 **새 파일을 추가하거나 수정하면, 그 변
 |---|---|---|
 | 편집·추가 대상(내 콘텐츠) | `Assets/Scripts`, `Assets/Prefabs`, `Assets/Resources`, `Assets/Images`, `Assets/VFX` | **격리** (공유하지 말 것) |
 | 읽기전용 서드파티 SDK/툴 | `TextMesh Pro`, `Firebase`, `Best HTTP`, `AmplifyShaderEditor` | `link`/`link-children` 공유 OK |
-| 재생성되는 무거운 캐시 | `Library/ShaderCache`, `Library/PackageCache`, `Library/Bee` | `cache` 로 junction 공유 OK |
+| 재생성되는 무거운 캐시 | `Library/ShaderCache`, `Library/PackageCache` | `cache` 로 junction 공유 OK |
+| 절대경로를 기록하는 빌드 캐시 | `Library/Bee` | `cache` 의 `exclude` 로 공유 안 함 (아래) |
 | 배타 잠금/워크트리별 산출물 | `Library/ArtifactDB`, `Library/ScriptAssemblies`, `Library/Artifacts` | `cache` 의 `copy` 로 독립 |
 
 ### 액션별 결과 (Unity 기준)
@@ -262,8 +265,21 @@ manifest 를 격리(패턴 B: `Packages` junction 안 함)하면서 "패키지 �
 { "path": "unity/Library", "mode": "cache",
   "copy": ["ArtifactDB","ArtifactDB-lock","SourceAssetDB","SourceAssetDB-lock",
            "Artifacts","TempArtifacts","ScriptAssemblies","StateCache",
-           "ShaderCache.db","BuildPlayer.prefs","ilpp.pid","PackageManager"] }
+           "ShaderCache.db","BuildPlayer.prefs","ilpp.pid","PackageManager"],
+  "exclude": ["Bee"] }
 ```
+
+### Library/Bee 는 공유하지 않는다
+
+Bee(스크립트 컴파일 빌드 시스템)는 dag 파일에 프로젝트 **절대경로**를 기록한다
+(`"PayloadsFile": "<워크트리>/…/Library/Bee/….dag.payloads"` 등).
+
+- junction 으로 공유하면 워크트리가 컴파일할 때 main 의 Bee 에 워크트리 경로를 써 넣는다. 그 워크트리를
+  지운 뒤 main 에서 컴파일하면 `Internal build system error … Could not find a part of the path
+  "<워크트리>\…\Library\Bee\…"` 로 실패한다. 복구는 에디터를 닫고 main `Library/Bee` 내용을 지우면 된다
+  (재생성됨).
+- 복사해도 사본의 dag 가 main 경로를 가리켜 위험하다. 그래서 `exclude` 로 빼고 워크트리마다 새로 만든다
+  (첫 스크립트 컴파일만 처음부터 빌드).
 
 ### 안전 체크리스트
 

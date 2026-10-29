@@ -14,7 +14,8 @@
       "shares": [
         { "path": "unity/Library", "mode": "cache" },              // 캐시: 자식 dir는 junction, 파일+lock은 복사
         { "path": "unity/Library", "mode": "cache",
-          "copy": ["ArtifactDB","SourceAssetDB", ...] },            // copy 생략 시 Unity 기본 lock 목록 사용
+          "copy": ["ArtifactDB","SourceAssetDB", ...],              // copy 생략 시 Unity 기본 lock 목록 사용
+          "exclude": ["Bee"] },                                      // 공유하지 않음(절대경로를 박는 캐시 등)
         { "path": "unity/Packages", "mode": "link" },              // 통째로 junction
         { "path": "server/artifacts", "mode": "copy" },            // 통째로 복사(독립)
         { "path": "unity/Assets", "mode": "link-children",         // base 아래 children 각각 junction
@@ -142,7 +143,7 @@ foreach ($s in $cfg.shares) {
             $copyNames = if ($s.copy) { @($s.copy) } else { $DefaultCacheCopy }
             New-Item -ItemType Directory -Force -Path $dst | Out-Null
             $l = 0; $c = 0
-            Get-ChildItem -LiteralPath $src -Force | ForEach-Object {
+            Get-ChildItem -LiteralPath $src -Force | Where-Object { @($s.exclude) -notcontains $_.Name } | ForEach-Object {
                 $childDst = Join-Path $dst $_.Name
                 if (($copyNames -contains $_.Name) -or (-not $_.PSIsContainer)) {
                     Copy-Item -LiteralPath $_.FullName -Destination $childDst -Recurse -Force; $c++
