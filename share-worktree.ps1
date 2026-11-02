@@ -149,8 +149,13 @@ foreach ($s in $cfg.shares) {
             Get-ChildItem -LiteralPath $src -Force | Where-Object { $excludeNames -notcontains $_.Name } | ForEach-Object {
                 $childDst = Join-Path $dst $_.Name
                 if (($copyNames -contains $_.Name) -or (-not $_.PSIsContainer)) {
-                    Copy-Item -LiteralPath $_.FullName -Destination $childDst -Recurse -Force; $c++
-                } else { New-DirJunction $childDst $_.FullName; $l++ }
+                    # 기존 대상을 지우고 복사 — 중단 후 재실행해도 dir 안에 중첩 복사되지 않는다
+                    Write-Host "   📄 $($_.Name)" -ForegroundColor DarkGray
+                    Copy-PathInto $_.FullName $childDst; $c++
+                } else {
+                    Write-Host "   🔗 $($_.Name)" -ForegroundColor DarkGray
+                    New-DirJunction $childDst $_.FullName; $l++
+                }
             }
             $linked += $l; $copied += $c
             Write-Host "🔗 cache $($s.path)  (junction ${l}개 / 복사 ${c}개)" -ForegroundColor Cyan
