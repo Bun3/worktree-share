@@ -71,8 +71,16 @@ function New-DirJunction([string] $Link, [string] $Target) {
 function Copy-PathInto([string] $Src, [string] $Dst) {
     $parent = Split-Path -Parent $Dst
     if ($parent -and -not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
-    Remove-PathSafe $Dst
-    Copy-Item -LiteralPath $Src -Destination $Dst -Recurse -Force
+    if (-not (Test-Path -LiteralPath $Src -PathType Container)) {
+        Remove-PathSafe $Dst
+        Copy-Item -LiteralPath $Src -Destination $Dst -Force
+        return
+    }
+    # 링크는 먼저 끊는다 — 남겨두면 /MIR 이 링크 너머 원본을 덮어쓴다
+    if ((Test-ReparsePoint $Dst) -or (Test-Path -LiteralPath $Dst -PathType Leaf)) { Remove-PathSafe $Dst }
+    # robocopy: 260자 넘는 경로(PackageCache 등)도 복사, /MIR 로 재실행 시 동기화, /XJ 로 원본 내 링크는 따라가지 않음
+    & robocopy $Src $Dst /MIR /XJ /COPY:DAT /DCOPY:DAT /R:1 /W:1 /MT:16 /NFL /NDL /NJH /NJS /NP | Out-Null
+    if ($LASTEXITCODE -ge 8) { throw "robocopy 실패(exit $LASTEXITCODE): $Src -> $Dst" }
 }
 function Invoke-GitCapture {
     param([Parameter(ValueFromRemainingArguments)] [string[]] $GitArgs)
