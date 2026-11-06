@@ -18,6 +18,7 @@
           "exclude": ["Bee"] },                                      // 공유하지 않음. 생략 시 ["Bee"], [] 면 제외 없음
         { "path": "unity/Packages", "mode": "link" },              // 통째로 junction
         { "path": "server/artifacts", "mode": "copy" },            // 통째로 복사(독립)
+        { "path": "unity/Library", "mode": "copy", "exclude": ["Bee"] }, // 통째로 복사하되 바로 아래 exclude 이름은 제외
         { "path": "unity/Assets", "mode": "link-children",         // base 아래 children 각각 junction
           "children": ["Plugins","Firebase", ...], "optional": true }
       ]
@@ -68,7 +69,7 @@ function New-DirJunction([string] $Link, [string] $Target) {
     if ($parent -and -not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
     New-Item -ItemType Junction -Path $Link -Target $Target | Out-Null
 }
-function Copy-PathInto([string] $Src, [string] $Dst) {
+function Copy-PathInto([string] $Src, [string] $Dst, [string[]] $Exclude = @()) {
     $parent = Split-Path -Parent $Dst
     if ($parent -and -not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
     if (-not (Test-Path -LiteralPath $Src -PathType Container)) {
@@ -79,7 +80,10 @@ function Copy-PathInto([string] $Src, [string] $Dst) {
     # 링크는 먼저 끊는다 — 남겨두면 /MIR 이 링크 너머 원본을 덮어쓴다
     if ((Test-ReparsePoint $Dst) -or (Test-Path -LiteralPath $Dst -PathType Leaf)) { Remove-PathSafe $Dst }
     # robocopy: 260자 넘는 경로(PackageCache 등)도 복사, /MIR 로 재실행 시 동기화, /XJ 로 원본 내 링크는 따라가지 않음
-    & robocopy $Src $Dst /MIR /XJ /COPY:DAT /DCOPY:DAT /R:1 /W:1 /MT:16 /NFL /NDL /NJH /NJS /NP | Out-Null
+    # exclude 는 Src 바로 아래 이름만 제외(전체 경로 지정 — 같은 이름의 하위 폴더는 영향 없음)
+    $xd = @($Exclude | Where-Object { $_ } | ForEach-Object { Join-Path $Src $_ })
+    $xdArgs = if ($xd.Count) { @('/XD') + $xd } else { @() }
+    & robocopy $Src $Dst /MIR /XJ /COPY:DAT /DCOPY:DAT /R:1 /W:1 /MT:16 /NFL /NDL /NJH /NJS /NP @xdArgs | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "robocopy 실패(exit $LASTEXITCODE): $Src -> $Dst" }
 }
 function Invoke-GitCapture {
@@ -146,7 +150,7 @@ foreach ($s in $cfg.shares) {
             Write-Host "🔗 link  $($s.path)" -ForegroundColor Cyan
         }
         'copy' {
-            Copy-PathInto $src $dst; $copied++
+            Copy-PathInto $src $dst @($s.exclude); $copied++
             Write-Host "📄 copy  $($s.path)" -ForegroundColor DarkYellow
         }
         'cache' {
